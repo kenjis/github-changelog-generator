@@ -117,22 +117,31 @@ use stdClass;
              throw new Exception('No releases found for this repository');
          }
 
+         $releasesWithIssues = [];
+
          do {
-             $currentRelease = current($releases);
+             $currentRelease = (object) current($releases);
 
             if ($startDate && date_diff(new DateTime($currentRelease->published_at), $startDate)->days <= 0) {
                 continue;
             }
 
              $lastRelease = next($releases);
-             $lastReleaseDate = $lastRelease ? new DateTime($lastRelease->published_at) : null;
+             if ($lastRelease === false) {
+                 $lastReleaseDate = null;
+             } else{
+                 $lastRelease = (object) $lastRelease;
+                 $lastReleaseDate = new DateTime($lastRelease->published_at);
+             }
              prev($releases);
 
              $currentRelease->issues = $this->collectIssues($lastReleaseDate);
 
+             $releasesWithIssues[] = $currentRelease;
+
          } while (next($releases));
 
-         return $releases;
+         return $releasesWithIssues;
      }
 
      /**
@@ -144,13 +153,18 @@ use stdClass;
       */
      private function collectIssues(DateTimeInterface $lastReleaseDate = null): array
      {
-         if (!$this->currentIssues) {
-             $this->currentIssues = iterator_to_array($this->repository->getIssues(['state' => 'closed']));
+         if (! $this->currentIssues) {
+             $this->currentIssues = [];
+
+             foreach ($this->repository->getIssues(['state' => 'closed']) as $issue) {
+                 $this->currentIssues[] = $issue;
+             }
          }
 
          $issues = [];
 
          foreach ($this->currentIssues as $x => $issue) {
+             $issue = (object) $issue;
              if (new DateTime($issue->closed_at) > $lastReleaseDate || $lastReleaseDate == null) {
                  unset($this->currentIssues[$x]);
 
@@ -160,6 +174,7 @@ use stdClass;
                      $events = $this->repository->getIssueEvents($issue->number);
 
                      foreach ($events as $event) {
+                         $event = (object) $event;
                          if (in_array($event->event, self::$supportedEvents) && !empty($event->commit_id)) {
                              $issues[$type][] = $issue;
                              break;
@@ -196,7 +211,8 @@ use stdClass;
         foreach ($this->issueLabelMapping as $changeType => $labelsUsedToDetermineChangeType) {
             foreach ((array) $labelsUsedToDetermineChangeType as $labelForChangeType) {
                 foreach ($issue->labels as $issueLabel) {
-                    if (strcasecmp($issueLabel->name, $labelForChangeType) === 0) {
+                    $labelName = $issueLabel->name ?? '';
+                    if (strcasecmp($labelName, $labelForChangeType) === 0) {
                         return $changeType;
                     }
                 }

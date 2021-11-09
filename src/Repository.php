@@ -174,6 +174,8 @@ class Repository
      */
     private function fetch(string $url): Generator
     {
+        echo 'Fetching: ' . $url . PHP_EOL;
+
         set_time_limit(15);     // prevent timeouts - time limit is reset on every recursive call
 
         $response = fopen($url, 'r', false, $this->context);

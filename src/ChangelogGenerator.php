@@ -135,6 +135,7 @@ use stdClass;
              }
              prev($releases);
 
+             // @FIXME Collecting issues from the release date is not accurate.
              $currentRelease->issues = $this->collectIssues($lastReleaseDate);
 
              $releasesWithIssues[] = $currentRelease;
